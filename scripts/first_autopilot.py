@@ -25,7 +25,7 @@ class ExampleNNMsgProcessor:
         self.device = torch.device("cpu")
 
         ckpt = torch.load(ckpt_path, map_location=self.device)
-        self.model = ControllerMLP(16, 128, 4, p_drop=0.0).to(self.device)
+        self.model = ControllerMLP(16, 32, 4, p_drop=0.0).to(self.device)
         self.model.load_state_dict(ckpt["state_dict"])
         self.model.eval()
 

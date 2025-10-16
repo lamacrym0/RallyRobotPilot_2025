@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 # ------------------------------------------------------------
 # 0) Sélection des fichiers à charger (plusieurs fichiers)
 # ------------------------------------------------------------
-INPUT_FILES = ["record_0.npz"]
+INPUT_FILES = ["record_0.npz","record_0_aug.npz"]
 
 def gather_paths(specs):
     """Résout specs (str/Path ou liste) en liste de fichiers existants."""
@@ -145,7 +145,7 @@ class ControllerMLP(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-model = ControllerMLP(16, 128, 4, p_drop=0.1)
+model = ControllerMLP(16, 32, 4, p_drop=0.1)
 
 # ------------------------------------------------------------
 # 4) Loss (BCEWithLogits + pos_weight) & optimiseur
@@ -178,7 +178,7 @@ def evaluate(loader):
             n_batches += 1
     return total_loss / n_batches, elem_acc / n_batches
 
-epochs = 30
+epochs = 100
 for epoch in range(1, epochs + 1):
     model.train()
     for xb, yb in train_loader:

@@ -20,7 +20,7 @@ class ExampleNNMsgProcessor:
         self.always_forward = True
 
     def nn_infer(self, message):
-        #   Do smart NN inference here
+        print("Received message with image of size", message.car_position,message.car_speed, message.car_angle,message.raycast_distances)
 
 
         return [("forward", True)]

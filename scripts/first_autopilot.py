@@ -1,11 +1,10 @@
-from PyQt6 import QtWidgets
+
 
 import torch
 import torch.nn as nn
-
+from PyQt6 import QtWidgets
 from data_collector import DataCollectionUI
 
-# ---------- Modèle (même archi que l'entraînement) ----------
 class ControllerMLP(nn.Module):
     def __init__(self, in_dim=16, hidden=128, out_dim=4, p_drop=0.0):
         super().__init__()
@@ -23,10 +22,8 @@ class ExampleNNMsgProcessor:
                  thresholds=(0.5, 0.5, 0.5, 0.5),
                  command_names=("forward", "back", "left", "right")):
 
-        # Device: CPU par défaut (évite surcoût transfert GPU si petit modèle)
         self.device = torch.device("cpu")
 
-        # Charge checkpoint (+ normalisation)
         ckpt = torch.load(ckpt_path, map_location=self.device)
         self.model = ControllerMLP(16, 128, 4, p_drop=0.0).to(self.device)
         self.model.load_state_dict(ckpt["state_dict"])

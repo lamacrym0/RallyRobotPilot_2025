@@ -1,4 +1,3 @@
-# pip install torch --upgrade  (si besoin)
 import os, glob, pickle, lzma
 from pathlib import Path
 
@@ -8,14 +7,8 @@ from torch.utils.data import TensorDataset, DataLoader
 
 # ------------------------------------------------------------
 # 0) Sélection des fichiers à charger (plusieurs fichiers)
-#    Tu peux mettre:
-#      - une liste: ["record_8.xz", "record_9.xz"]
-#      - un motif glob: "data/*.xz"
-#      - un dossier: "data_logs/"
-#    -> tous seront résolus en une liste de fichiers
 # ------------------------------------------------------------
-INPUT_FILES = ["record_0.npz","record_alex_0n.npz","record_alex_1n.npz","record_alex_2n.npz","record_alex_3n.npz","record_alex_4n.npz","record_alex_5n.npz","record_alex_6n.npz","record_alex_7n.npz"]
-
+INPUT_FILES = ["record_0.npz"]
 
 def gather_paths(specs):
     """Résout specs (str/Path ou liste) en liste de fichiers existants."""
@@ -25,10 +18,8 @@ def gather_paths(specs):
     for s in specs:
         p = Path(s)
         if p.is_dir():
-            # Tous les fichiers du dossier (récursif)
             files += [str(fp) for fp in p.rglob("*") if fp.is_file()]
         else:
-            # Motif glob OU fichier direct
             matches = glob.glob(str(p))
             if matches:
                 files += [str(fp) for fp in matches if Path(fp).is_file()]
@@ -39,10 +30,10 @@ def gather_paths(specs):
         raise FileNotFoundError(f"Aucun fichier trouvé pour {specs}")
     return files
 
-
 # ------------------------------------------------------------
 # 1) Chargement & parsing -> X:[N,16], y:[N,4] (schéma A uniquement)
 #    Chaque item: (speed: float, raycast_distances: tuple[15], current_controls: tuple[4])
+#    Décalage temporel: on associe X_t -> y_{t+2} par fichier
 # ------------------------------------------------------------
 def _pickle_load_any(path):
     """Tente d'abord lzma, sinon open standard (pour fichiers non-compressés)."""
@@ -60,7 +51,7 @@ def load_raw(path, strict=True):
     except Exception as e:
         if strict:
             raise
-        print(f"⚠️  Fichier ignoré (lecture impossible): {path} -> {e}")
+        print(f"Fichier ignoré (lecture impossible): {path} -> {e}")
         return []
 
     samples = []
@@ -77,7 +68,6 @@ def load_raw(path, strict=True):
         except Exception as ex:
             if strict:
                 raise
-            # On ignore juste cet enregistrement corrompu
             print(f"⚠️  Sample ignoré dans {path}: {ex}")
     return samples
 
@@ -87,26 +77,35 @@ print(f"Fichiers détectés ({len(file_list)}):")
 for p in file_list:
     print(" -", p)
 
-raw_samples_all = []
+# Concaténation avec décalage y+2 PAR FICHIER
+SHIFT = 2  # X_t -> y_{t+2}
+X_list, y_list = [], []
+total_raw, total_used = 0, 0
 for p in file_list:
     cur = load_raw(p, strict=False)  # passe en True si tu veux être strict
-    print(f"  {p}: {len(cur)} échantillons")
-    raw_samples_all.extend(cur)
+    n_raw = len(cur)
+    total_raw += n_raw
+    # construire feats/labels dans l'ordre temporel, puis décaler
+    feats  = [[s] + list(d) for (s, d, c) in cur]     # [1+15]=16
+    labels = [list(c)         for (s, d, c) in cur]   # [4]
+    if n_raw > SHIFT:
+        for i in range(n_raw - SHIFT):
+            X_list.append(feats[i])
+            y_list.append(labels[i + SHIFT])
+        used = n_raw - SHIFT
+    else:
+        used = 0
+    total_used += used
+    print(f"  {p}: {n_raw} échantillons -> utilisés {used} (décalage y+{SHIFT})")
 
-if not raw_samples_all:
-    raise RuntimeError("Aucun échantillon valide après chargement de tous les fichiers.")
-
-# Concatène en X:[N,16], y:[N,4]
-X_list, y_list = [], []
-for speed, dists, ctrls in raw_samples_all:
-    X_list.append([speed] + list(dists))  # 1 + 15 = 16 features
-    y_list.append(list(ctrls))            # 4 labels 0/1
+if not X_list:
+    raise RuntimeError("Aucun échantillon valide après décalage y+2.")
 
 X = torch.tensor(X_list, dtype=torch.float32)  # [N,16]
 y = torch.tensor(y_list, dtype=torch.float32)  # [N,4]
 N = X.shape[0]
 assert X.shape[1] == 16 and y.shape[1] == 4, (X.shape, y.shape)
-print(f"Total échantillons: {N}")
+print(f"Total bruts: {total_raw} | Total utilisés après décalage (y+{SHIFT}): {N}")
 
 # ------------------------------------------------------------
 # 2) Split (train/val) + normalisation (stats calculées sur le train)
@@ -124,7 +123,6 @@ mean = X[train_idx].mean(0, keepdim=True)
 std  = X[train_idx].std(0, keepdim=True).clamp_min(1e-6)
 Xn   = (X - mean) / std
 
-from torch.utils.data import TensorDataset, DataLoader
 train_ds = TensorDataset(Xn[train_idx], y[train_idx])
 val_ds   = TensorDataset(Xn[val_idx],   y[val_idx]) if n_val > 0 else None
 
@@ -144,7 +142,7 @@ class ControllerMLP(nn.Module):
             nn.Dropout(p_drop),
             nn.Linear(hidden, out_dim)  # logits (pas de sigmoid ici)
         )
-    def forward(self, x): 
+    def forward(self, x):
         return self.net(x)
 
 model = ControllerMLP(16, 128, 4, p_drop=0.1)
@@ -180,7 +178,7 @@ def evaluate(loader):
             n_batches += 1
     return total_loss / n_batches, elem_acc / n_batches
 
-epochs = 40
+epochs = 30
 for epoch in range(1, epochs + 1):
     model.train()
     for xb, yb in train_loader:

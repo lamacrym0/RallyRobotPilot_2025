@@ -18,7 +18,7 @@ class ControllerMLP(nn.Module):
 
 
 class ExampleNNMsgProcessor:
-    def __init__(self, ckpt_path="controller_multilabel.pt",
+    def __init__(self, ckpt_path="controller_multilabel_fini_tour_pixel.pt",
                  thresholds=(0.5, 0.5, 0.5, 0.5),
                  command_names=("forward", "back", "left", "right")):
 
@@ -87,9 +87,8 @@ class ExampleNNMsgProcessor:
                 self.state[name] = new_flag
                 to_send.append((name, new_flag))
 
-        # (Optionnel) debug
+        
         # print(f"probs={probs.round(3)} decisions={decisions} to_send={to_send}")
-
         return to_send
 
     def process_message(self, message, data_collector):
@@ -106,10 +105,10 @@ if __name__ == "__main__":
 
     app = QtWidgets.QApplication(sys.argv)
 
-    # Instancie le “cerveau” NN
+    # Instancie le NN
     nn_brain = ExampleNNMsgProcessor(
-        ckpt_path="controller_multilabel.pt",           
-        thresholds=(0.5, 0.5, 0.5, 0.5),                # ex: frein un peu plus strict
+        ckpt_path="controller_multilabel_fini_tour_pixel.pt",           
+        thresholds=(0.5, 0.5, 0.5, 0.5),                
         command_names=("forward", "back", "left", "right")
     )
 

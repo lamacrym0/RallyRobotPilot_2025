@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 # ------------------------------------------------------------
 # 0) Sélection des fichiers à charger (plusieurs fichiers)
 # ------------------------------------------------------------
-INPUT_FILES = ["record_0.npz","record_0_aug.npz"]
+INPUT_FILES = ["record_0.npz","record_1.npz","record_2.npz","record_3.npz","record_4.npz","record_5.npz","record_6.npz","record_7.npz","record_8.npz","record_9.npz","record_0_mirror.npz","record_1_mirror.npz","record_2_mirror.npz","record_3_mirror.npz","record_4_mirror.npz","record_5_mirror.npz","record_6_mirror.npz","record_7_mirror.npz","record_8_mirror.npz","record_9_mirror.npz"]
 
 def gather_paths(specs):
     """Résout specs (str/Path ou liste) en liste de fichiers existants."""
